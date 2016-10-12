@@ -1,8 +1,9 @@
 #include <stdio.h>
 
 #define ROUTER 5
+#define PACKET 3
 
-int pak[20];  // 0~8: 各ゾーンに対応, 9: 到達, 10:delayA待機(仮), -1: 消滅フラグ
+int pak[PACKET];  // 0~8: 各ゾーンに対応, 9: 到達, 10:delayA待機(仮), -1: 消滅フラグ
 int cnt = 0;  // 時刻
 const int aa = 12, ii = 24, uu = 12, ee = 6;
 const int delayA = 2, delayI = 20, delayU = 30, delayE = 2;
@@ -16,12 +17,13 @@ int main() {
   int i;
   int nowA, nowa, nowI, nowb, nowU, nowc, nowE, nowBob, nowAdelay;
   int Icnt = 0, Ucnt = 0, Ecnt = 0;
-  int Acnt = 0, Bcnt = 0, Ccnt = 0, Bobcnt = 0;
+  int Acnt = 0, Bcnt = 0, Ccnt[PACKET], Bobcnt = 0;
   int delayAcnt = 0;
 
   /* ---- 初期化 ---- */
-  for (i = 0; i < 20; i++) {
+  for (i = 0; i < PACKET; i++) {
     pak[i] = 0;
+    Ccnt[i] = 0;
   }
   pak[0] = 1;
   /* -- 初期化終了 -- */
@@ -53,11 +55,18 @@ int main() {
     // ゾーンC
     nowc = chkzone(6);
     if (nowc != -1) {
-      Ccnt++;
-      if (delayU <= Ccnt && cntzone(7) == 0) {
-	pak[nowc]++;
-	Ccnt = 0;
+      if (Ccnt[nowc] == 0) Ccnt[nowc]++;
+      else {
+	for (i = 0; i < PACKET; i++) {
+	  if (0 < Ccnt[i]) Ccnt[i]++;
+	  if (delayU <= Ccnt[i] && cntzone(7) == 0) {
+	    pak[i]++;
+	    Ccnt[i] = -1;
+	    break;
+	  }
+	}
       }
+      // printf("Ccnt[nowc] = %d\n", Ccnt[nowc]);
     }
     
     // ゾーンう
@@ -131,7 +140,7 @@ int main() {
     // ゾーンあ
     nowA = chkzone(1);
     if (nowA != -1 && (cnt - 1) % (aa) == 0 && cnt != 1) {    // タイマが12の倍数なら
-      if (nowA < 20) {  // 送って次を呼ぶ
+      if (nowA < PACKET) {  // 送って次を呼ぶ
 	pak[nowA] = 10;
       }
       pak[nowA + 1] = 1;
@@ -139,8 +148,8 @@ int main() {
 
     /* デバッグ */
     printf("pak[] = {");
-    for (i = 0; i < 19; i++) printf("%2d, ", pak[i]);
-    printf("%2d}  time = %d\n", pak[19], cnt);
+    for (i = 0; i < PACKET - 1; i++) printf("%2d, ", pak[i]);
+    printf("%2d}  time = %d\n", pak[PACKET - 1], cnt);
 
     /* 終了確認 */
     if (chkend() == 1) break;
@@ -154,8 +163,15 @@ int main() {
 int chkzone(int zone) {
   int i;
 
-  for (i = 0; i < 20; i++) {
-    if (pak[i] == zone) return i;
+  if (zone != 6) {
+    for (i = 0; i < PACKET; i++) {
+      if (pak[i] == zone) return i;
+    }
+  }
+  else {
+    for (i = PACKET - 1; 0 <= i; i--) {
+      if (pak[i] == zone) return i;
+    }
   }
   return -1;
 }
@@ -164,7 +180,7 @@ int chkzone(int zone) {
 int cntzone(int zone) {
   int i, num = 0;
   
-  for (i = 0; i < 20; i++) {
+  for (i = 0; i < PACKET; i++) {
     if (pak[i] == zone) num++;
   }
   return num;
@@ -174,7 +190,7 @@ int cntzone(int zone) {
 int chkend() {
   int i, num = 0;
 
-  for (i = 0; i < 20; i++) {
+  for (i = 0; i < PACKET; i++) {
     if (pak[i] == 9 || pak[i] == -1) {
       num++;
       // printf("%d, num = %d\n", i, num);      
@@ -182,8 +198,8 @@ int chkend() {
     // printf("num = %d\n", num);
   }
 
-  if (num == 20) {
-    // printf("num = %d  <= 20\n", num);
+  if (num == PACKET) {
+    // printf("num = %d  <= PACKET\n", num);
     return 1;
   }
   return 0;
